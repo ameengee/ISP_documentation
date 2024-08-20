@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Fast ISP Documentation</title>
+        <link rel="stylesheet" href="ISP-styles.css">
+    </head>
+    
+    <body>
+
+      <nav id='navbar'>
+        <header class="bold">Fast ISP Documentation</header>
+        <ul>
+          <li>
+            <a href='#Introduction' class='nav-link'>Introduction</a>
+          </li>
+          <li>
+            <a href='#CMOS_Sensor_and_Bayer_Image' class='nav-link'>CMOS Sensor and Bayer Image</a>
+          </li>
+          <li>
+            <a href='#Dead_Pixel_Concealment' class='nav-link'>Dead Pixel Concealment</a>
+          </li>
+          <li>
+            <a href='#Black_Level_Compensation' class='nav-link'>Black Level Compensation</a>
+          </li>
+          <li>
+            <a href='#Lens_Shading_Correction' class='nav-link'>Lens Shading Correction</a>
+          </li>
+          <li>
+            <a href='#Anti-Aliasing_Noise_Filter' class='nav-link'>Anti-Aliasing Noise Filter</a>
+          </li>
+          <li>
+            <a href='#AWB_Gain_Control' class='nav-link'>AWB Gain Control</a>
+          </li>
+          <li>
+            <a href='#Color_Filter_Array_Interpolation' class='nav-link'>Color Filter Array Interpolation</a>
+          </li>
+          <li>
+            <a href='#Gamma_Correction' class='nav-link'>Gamma Correction</a>
+          </li>
+          <li>
+            <a href='#Color_Space_Conversion' class='nav-link'>Color Space Conversion</a>
+          </li>
+          <li>
+            <a href='#Noise_Filter_for_Chroma' class='nav-link'>Noise Filter for Chroma</a>
+          </li>
+          <li>
+            <a href='#Hue_Saturation_Control' class='nav-link'>Hue Saturation Control</a>
+          </li>
+          <li>
+            <a href='#Noise_Filter_for_Luma' class='nav-link'>Noise Filter for Luma</a>
+          </li>
+          <li>
+            <a href='#Edge_Enhancement_Filter' class='nav-link'>Edge Enhancement Filter</a>
+          </li>
+          <li>
+            <a href='#Contrast_Brightness_Control' class='nav-link'>Contrast Brightness Control</a>
+          </li>
+        </ul>
+      </nav>
+
+      <main id='main-doc'>
+
+        <section class='main-section' id='Introduction'>
+          <header class="bold">Introduction</header>
+          <article>
+            <p>This documentation will cover the basics of how a camera processes light captured through sensors using an image signal processing pipeline (ISP) to procude crips, colorful, and compressed images.</p>
+            <p>I am also posting YouTube tutorials that go in depth in regards to how each step in the pipeline works, as well as how to implement each step in python code.</p>
+            <ul>
+              <li>Here is the <a href='https://www.youtube.com/playlist?list=PLYeyD3V-GDlRpKEI9lWRqhQ2l_cyCxQjY'>link</a> to the YouTube playlist.</li>
+              <li>Here is the <a href='https://drive.google.com/drive/folders/10v-zYS3jZPgDn0IxzZH8v7MW8SD_cREL?usp=sharing'>link</a> to the bayer domain image I use in the videos, githubs, and this documentation.</li>
+              <li>Note, the YouTube videos cover a basic implementation of the ISP while conceptually explaining the fundamental concepts. I have also built a more advanced, fast ISP that utilizes Numpy Vectorization techniques to increase the speed of the pipeline by over 120 times (from ~25 minutes to ~10 seconds). This documentation will cover the fast ISP. Here is the <a href='https://github.com/ameengee/Fast_ISP'>link</a> to my fast ISP github page.</li>
+            </ul>
+          </article>
+        </section>
+
+        <section class='main-section' id='CMOS_Sensor_and_Bayer_Image'>
+          <header class="bold">CMOS Sensor and Bayer Image</header>
+          <article>
+            <p><a href='https://www.youtube.com/watch?v=NLz_GtWAlMc&list=PLYeyD3V-GDlRpKEI9lWRqhQ2l_cyCxQjY&index=1' target="_blank">Link</a> to the CMOS sensor video</p>
+            <p>The CMOS sensor is built of an array of pixels, each with a micro-lens, color filter, and silicon diode. </p>
+            <img src="images/pixel_anatomy.png" alt="pixel anatomy image" class="rect-img" loading="lazy">
+            <p>Incoming light gets focused onto the color filter, and only light of the correct color can pass through the color filter to strike the silicon diode. The photoelectric effect allows for electrons to build up from the light in an electron well. The electrons then create a voltage signal, which is read by a sensor. Here is a <a href='https://medium.com/@ameen.gee/with-the-worlds-growing-concern-over-climate-change-and-the-need-to-transition-to-sustainable-7951eae872b6'>link</a> to a basic article I wrote that covers concepts like the photoelectric effect if you need a refresher.</p>
+            <p>A black and white, checkerboard image is created based on the voltage signals, and color information is stored in the location of the pixel.</p>
+            <img src='images/bayer-type.png' alt='bayer-type image' class="rect-img" loading="lazy">
+            <p class="img-description">This is how different bayer domain images look. The type of bayer image is defined by the color filter of the top-left 2x2 section. Note, the actual Bayer image is black and white and does not have these colorings. The colors are included in the diagram only for clarity.</p>
+            <img src='images/raw-bayer.png' alt='raw bayer image' class="bayer-img" loading="lazy">
+            <p class="img-description">This is what the raw bayer domain image looks like before any transformations are applied.</p>
+          </article>
+        </section>
+
+        <section class='main-section' id='Dead_Pixel_Concealment'>
+          <header class="bold">Dead Pixel Concealment</header>
+          <article>
+            <p><a href='https://www.youtube.com/watch?v=IwFCUi7FaX8&list=PLYeyD3V-GDlRpKEI9lWRqhQ2l_cyCxQjY&index=2' target="_blank">Link</a> to the DPC video</p>
+            <p>A common aspect ratio of 1920 x 1080 p will require a CMOS sensor of over 2 million pixels. Some of these pixels are bound to be broken or otherwise 'dead'. For example, the voltage sensor on a pixel may have gotten disconnedcted from the potential well, so the pixel at this location is always returning a 'measured' voltage of 0.</p>
+            <p>We detect dead pixels by comparing their values to their surrounding neighbor pixels. If there is a significant difference, we correct the dead pixel by mathematically approximating its value based on the value of its neighbors.</p>
+            <img src='images/neighbor-diagram.png' alt='neighbor diagram' class="diagram" loading="lazy">
+            <p class="img-description">Note, the neighboring pixels are not literally the pixels touching p0, but rather the 8 surrounding pixels of the same 'color' as p0. In the above image, if p0 is a pixel that had a red filter on it, then p1-p8 also had red filters.</p>
+            <p>The formula we use to detect dead pixels is the following: </p>
+              <code class="formula">
+  diff(x) = absolute_value(p0 - px), {1<=x<=8}
+  if diff(x) > threshold for any x, p0 = dead pixel
+              </code>
+            <p>Where p0 is the center pixel and px refers to the neighboring pixels.</p>
+            <ol>
+                <li>To ensure corner pixels have a full set of neighbors, we pad the image. Then, to vectorize this operation, we create seperate arrays for p0-p8. To emphasize this important point again, p0-p8 are spread across a 5x5 region to ensure they are all representing the same color pixels.</li>
+                  <code class="python">
+  padded_bayer = np.pad(bayer, (2,2), 'reflect')
+  
+  p1 = padded_bayer[:-4:1, :-4:1]
+  p2 = padded_bayer[:-4:1, 2:-2:1]
+  p3 = padded_bayer[:-4:1, 4::1]
+  p4 = padded_bayer[2:-2:1, :-4:1]
+  p0 = padded_bayer[2:-2:1, 2:-2:1]
+  p5 = padded_bayer[2:-2:1, 4::1]
+  p6 = padded_bayer[4::1, :-4:1]
+  p7 = padded_bayer[4::1, 2:-2:1]
+  p8 = padded_bayer[4::1, 4::1]
+                  </code>
+                <li>Then, we can create new arrays with the absolute value of the difference between p0 and p1-p8. Anywhere the difference exceeds a given threshold, there is a dead pixel.</li>
+                  <code class="python">
+  neighbors = np.array([p1, p2, p3, p4, p5, p6, p7, p8])
+  diff = np.abs(neighbors - p0) 
+  condition = diff > thresh
+  sum = np.sum(condition, axis = 0) 
+                  </code>
+            </ol>
+            <p>We now have the array sum, which is an array of the same size as the original bayer image. If the value of sum at a certain index is 0, then the pixel at this index is reasonably similar to its neighboring pixels, and is declared not dead. If sum is greater than 0, the pixel is declared dead.</p>
+            <p>To correct the dead pixels, one option is to replace the dead pixels with the average value of p1-p8. We can do so simply with the following command: </p>
+              <code class="python">
+  mean = np.mean(neighbors, axis = 0)
+  dpc_img = np.where(sum >= 1, mean, bayer) 
+              </code>
+            <p>Another option is to use a gradient based approach that is more sensitive to edges in the image. There are 4 directions that an edge can take that cross through p0 - vertical, horizontal, diagonal right, and diagonal left.</p>
+            <img src="images/gradient-diagram.png" alt='gradient neighbors diagram' class="diagram" loading="lazy">
+            <p>From here, we can compute the average value of the pixels involved in each gradient. For example, </p>
+              <code class="formula">
+  dv = (p2 + p7 + 1) // 2
+              </code>
+            <p>Of the four directional gradients, the one with the minimum value will have the least change in brightness intensity across the given direction, and will therefore be the least likely direction to pass across an edge. Calculating p0 using an average of only this direction's neighbroing pixels will help to avoid edge blurring.</p>
+            <code class="python">
+  dv = (p2 + p7 + 1) // 2
+  dh = (p4 + p5 + 1) // 2
+  ddr = (p1 + p8 + 1) // 2
+  ddl = (p3 + p6 + 1) // 2
+  min_gradients = np.minimum.reduce((dv, dh, ddr, ddl))
+
+  dpc_img = np.where(sum >= 1, min_gradients, bayer)
+            </code>
+            <p>Regardless of which method you choose though, the effects will likely not be visible to the naked eye yet, since there are millions of pixels, and generally very few are dead. However, with a complete pipeline, the effects of each module can be seen easily by removing the modules one at a time and viewing the final results.</p>
+            <img src='images/DPC-image.png' alt='DPC image' class="bayer-img" loading="lazy">
+            <p class="img-description">Resulting image after applying Dead Pixel Concealment</p>
+            <div class="details-container">
+              <details>
+                <summary>Show Full DPC Code</summary>
+                <code>
+  def DPC(bayer, thresh):
+    """
+    inputs:
+      bayer = raw bayer domain image
+      thresh = threshold value
+
+    outputs:
+      dpc_img = bayer domain image with dead pixels corrected for with mean filter
+    """
+
+    padded_bayer = np.pad(bayer, (2,2), 'reflect')
+    thresh = thresh * 8
+
+    p1 = padded_bayer[:-4:1, :-4:1] # create 9 different arrays for p0:p8
+    p2 = padded_bayer[:-4:1, 2:-2:1]
+    p3 = padded_bayer[:-4:1, 4::1]
+    p4 = padded_bayer[2:-2:1, :-4:1]
+    p0 = padded_bayer[2:-2:1, 2:-2:1]
+    p5 = padded_bayer[2:-2:1, 4::1]
+    p6 = padded_bayer[4::1, :-4:1]
+    p7 = padded_bayer[4::1, 2:-2:1]
+    p8 = padded_bayer[4::1, 4::1]
+
+    dv = (p2 + p7 + 1) // 2
+    dh = (p4 + p5 + 1) // 2
+    ddr = (p1 + p8 + 1) // 2
+    ddl = (p3 + p6 + 1) // 2
+    min_gradients = np.minimum.reduce((dv, dh, ddr, ddl))
+
+    neighbors = np.array([p1, p2, p3, p4, p5, p6, p7, p8]) # store p1:p8 in a seperate array
+
+    diff = np.abs(neighbors - p0) # store absolute differences between p1:p8 and p0
+    condition = diff > thresh # p1:p8 that stores location of all dead pixels
+    sum = np.sum(condition, axis = 0) # allows you to check only one 2d array, and test for missed dead pixels with all neighbors
+
+    dpc_img = np.where(sum >= 1, min_gradients, bayer).astype(np.uint16) # if labelled dead by any neighbor, replace with mean
+
+    return dpc_img
+
+  thresh = np.max(bayer) * 0.05
+  dpc_img = DPC(bayer, thresh)
+
+  plt.imshow(dpc_img, cmap='gray')
+                </code>
+              </details>
+            </div>
+          </article>
+        </section>
+
+        <section class='main-section' id='Black_Level_Compensation'>
+          <header class="bold">Black Level Compensation</header>
+          <article>
+            <p><a href='https://www.youtube.com/watch?v=LR6ZsJ3x1jA&list=PLYeyD3V-GDlRpKEI9lWRqhQ2l_cyCxQjY&index=3' target="_blank">Link</a> to the BLC video</p>
+            <p>We would expect that the pixel value for a section of an image that is supposed to be black would be 0. But there will always be light falling on every pixel when a picture is taken, and unless the pixel in question is dead, the photoelectric effect ensures that the returned voltage signal can not be 0.</p>
+            <p>To address this issue, Black Level Compensation will subtract an offset from each color channel. This offset is usually very small, roughly around 10-50.</p>
+            <ol>
+                <li>To apply Black Level Compensation, we first extract each channel using Numpy slicing.</li>
+                  <code class="python">
+  r = dpc_img[::2, ::2]
+  gr = dpc_img[1::2, ::2]
+  gb = dpc_img[::2, 1::2]
+  b = dpc_img[1::2, 1::2]
+                  </code>
+                <li>Then, we apply offsets.</li>
+                  <code class="python">
+  r = r + offsets['bl_r']
+  gr = gr + offsets['bl_gr']
+  gb = gb + offsets['bl_gb']
+  b = b + offsets['bl_b']
+                  </code>
+                <li>Finally, we recreate the image, again using Numpy slicing.</li>
+                  <code class="python">
+  blc_img[::2, ::2] = r
+  blc_img[1::2, ::2] = gr
+  blc_img[::2, 1::2] = gb
+  blc_img[1::2, 1::2] = b
+                  </code>
+            </ol>
+            <p>The image we are currently using is in the uint16 datatype, with values ranging from 0 to 65535. Just like in DPC, the effects of the transformation will not be visible to the naked eye yet. This time, it is since the offset is less than 0.1% of the total range, and the human eye cannot reliably detect such minor changes in light intensity.</p>
+            <img src="images/BLC-image.png" alt="BLC image" class="bayer-img" loading="lazy">
+            <p class="img-description">Resulting image after applying Black Level Compensation</p>
+            <div class="details-container">
+              <details>
+                <summary>Show Full BLC Code</summary>
+                <code>
+    def BLC(dpc_img, offsets):
+      """
+      inputs:
+        dpc_img = bayer domain image after dead pixel concealment
+        offsets = dictionary with black level offset values, keys (bl_r, bl_gr, bl_gb, bl_b)
+
+      outputs:
+        blc_img = bayer domain image with adjusted black levels
+      """
+
+      blc_img = np.empty(dpc_img.shape) # create an empty 2D array of the same size as the dpc_img
+
+      r = dpc_img[::2, ::2] # use array splicing to extract r, gr, gb, and b pixels from the full bayer image
+      gr = dpc_img[1::2, ::2]
+      gb = dpc_img[::2, 1::2]
+      b = dpc_img[1::2, 1::2]
+
+      r = r + offsets['bl_r'] # add offsets to each channel
+      gr = gr + offsets['bl_gr']
+      gb = gb + offsets['bl_gb']
+      b = b + offsets['bl_b']
+
+      blc_img[::2, ::2] = r # return the adjusted values to create a final image
+      blc_img[1::2, ::2] = gr
+      blc_img[::2, 1::2] = gb
+      blc_img[1::2, 1::2] = b
+
+      return np.clip(blc_img, 0, None)
+    
+    offsets = {'bl_r':-10, 'bl_gr':-10, 'bl_gb':-10, 'bl_b':-10}
+    blc_img = BLC(bayer, offsets)
+
+    plt.imshow(blc_img, cmap='gray')
+                </code>
+              </details>
+            </div>
+          </article>
+        </section>
+
+        <section class='main-section' id='Lens_Shading_Correction'>
+          <header class="bold">Lens Shading Correction</header>
+          <article>
+            <p><a href='https://www.youtube.com/watch?v=Z_nxri-DgX8&list=PLYeyD3V-GDlRpKEI9lWRqhQ2l_cyCxQjY&index=4' target="_blank">Link</a> to the LSC video</p>
+            <p>When a camera takes an image, a majority of the light taken in is focused by the lenses to the center. This leaves the central area of the image much brighter than the outer areas. This phenomenon is called lens shading.</p>
+            <p>To address this issue, we run a correction algorithm based on radial distance from the center of the image. The formulas is as follows: </p>
+              <code class="formula">
+  Corrected pixel value = Original pixel value × (1 + k×r) - offset
+              </code>
+              <p>Where r is the radial distance form the center of the image, k is a correction factor (very small, usually about 0.0005-0.005), and the offset is an integer.</p>
+            <ol>
+              <li>To apply the transformation in Python, we first use Numpy meshgrids to create an array that stores information about each index's distance from the center.</li>
+              <code class="python">
+  x, y = np.meshgrid(np.arange(cols), np.arange(rows))
+  radial_dist = np.sqrt((x - center_x)**2 + (y - center_y)**2)
+              </code>
+              <li>We don't want to overdo the correction, resulting in bright outsides and dimmer insides. To prevent this issue, we cap the radial-distance value.</li>
+              <code class="python">
+  radial_dist = np.where(radial_dist <= 1300, 1300, radial_dist)
+              </code>
+              <li>Finally, we apply the transformation formula to the previously created blc_img, and then rescale all values to be integers.</li>
+              <code class="python">
+  lsc_img = (blc_img * (k * radial_dist + 1) - offset).astype(np.uint16)
+              </code>
+            </ol>
+            <p>The more extreme that the k value for is, the more easily it is to visualize the effects of LSC. Regardless, unlike previous modules, you can visually start to see the effects of this module even with an average, useful k value.</p>
+            <img src="images/LSC-image.png" alt="LSC image" class="bayer-img" loading="lazy">
+            <p class="img-description">Resulting image after applying Lens Shading Correction with k = 0.0015</p>
+            <div class="details-container">
+              <details>
+                <summary>Show Full LSC Code</summary>
+                <code>
+  def LSC(blc_img, k, offset):
+    """
+    inputs:
+      blc_img = bayer domain image after black level compensation
+      k = correction factor to control strength of the correction
+      offset = offset in case the final image is too bright
+
+    outputs:
+      lsc_img = bayer domain image adjusted for lens shading
+    """
+
+    rows, cols = blc_img.shape
+    center_x = (cols // 2) + 1 # identify center if the image
+    center_y = (rows // 2) + 1
+    x, y = np.meshgrid(np.arange(cols), np.arange(rows)) # create an array where each index is the radial distance from the center
+    radial_dist = np.sqrt((x - center_x)**2 + (y - center_y)**2)
+    radial_dist = np.where(radial_dist <= 1300, 1300, radial_dist) # ensure correction only applies on the outer edges
+
+    lsc_img = (blc_img * (k * radial_dist + 1) - offset).astype(np.uint16) # apply correction
+
+    return lsc_img
+  
+  k = 0.0015
+  offset = 0
+  lsc_img = LSC(blc_img, k, offset)
+  
+  plt.imshow(lsc_img, cmap='gray')
+                </code>
+              </details>
+            </div>
+          </article>
+        </section>
+
+        <section class='main-section' id='Anti-Aliasing_Noise_Filter'>
+          <header class="bold">Anti-Aliasing Noise Filter</header>
+          <article>
+            <p><a href='https://www.youtube.com/watch?v=GAwihQhw7DI' target="_blank">Link</a> to the AAF video</p>
+            <p>Filters are mathematical or algorithimic expressions applied to images generally on a pixel-by-pixel basis, and they are used for various purposes such as enhancing, modifying, detecting, or extracting certain features like edges.</p>
+            <p>In our ISP, we will generally use filters through convolution techniques, which involve mapping a kernel of values onto each pixel of an image and applying operations.</p>
+            <p>We can use this 3x3 average filter being applied to the pixel p7 and this 5x5 section of an image as an example.</p>
+            <img src="images/average_filter_demo.png" alt="filter image" class="rect-img">
+            <p>When applying filters, you always make a copy of the image first. After that, when the filter is being applied to the pixel p7, the outlined section would be extracted to create a 3x3 matrix. Then, the extracted portion of the image would be multiplied elementwise to the averaging filter. Finally, you would take the sum of all values in the resulting 3x3 matrix, and map that value back on to p7 in the copy of the image, not the original image.</p>
+            <p>Once p7 has been updated in the copied image, the filter moves on to the next pixel, p8. </p>
+            <img src="images/filter_demo_2.png" alt="filter applied on p8" class="diagram">
+            <p>The process of applying the filter is the same as before, but the 3x3 area that is to be extracted from the image has changed. Most notably, p7 is now one of the values that is used in the calculation of the new p8 value. And this is the reason why we always update copies of the image, and we never update the original image directly. If we had changed the value of p7, the value of p7 being passed into p8's filter would be wrong. Then p9, p10, and all of the following pixels would have their input values being misrepresented.</p>
+            <p>When we actually apply filters in our ISP, instead of looping through the image with nested for loops one pixel at a time, we will instead create a unique array for each value used in the filter. For example, for a 3x3 filter applied on a bayer image, we would extract the following arrays:</p>
+            <code>
+  padded_img = np.pad(raw_img, (2,2), 'reflect')
+
+  p1 = padded_img[:-4:1, :-4:1]
+  p2 = padded_img[:-4:1, 2:-2:1]
+  p3 = padded_img[:-4:1, 4::1]
+  p4 = padded_img[2:-2:1, :-4:1]
+  p0 = padded_img[2:-2:1, 2:-2:1]
+  p5 = padded_img[2:-2:1, 4::1]
+  p6 = padded_img[4::1, :-4:1]
+  p7 = padded_img[4::1, 2:-2:1]
+  p8 = padded_img[4::1, 4::1]
+            </code>
+            <p>Now, the values at every index of the 9 arrays make up the values that would have been extracted by a 3x3 filter at the corresponding pixel. After that, we can stack up all of the arrays into a 3D array, and then take the sum across the new axis as shown below to finalize the filter.</p>
+            <code>
+  neighbors = np.array([p1, p2, p3, p4, p0, p5, p6, p7, p8]) / 9
+  filtered_img = (np.sum(neighbors, axis = 0)).astype(np.uint16)
+            </code>
+            <p>There are various different types of filters, and they each serve their own purposes. The anti-aliasing filter is a preventative filter that is applied to images to prevent future noise from interpolations like color filter array interpolation</p>
+            <p>The types of noise that anti-aliasing filter prevents is referred to by the umbrella term aliasing noise. The most notable aliasing noise is blocky or jagged edges, and other types include false color artifacts and moire patterns.</p>
+            <p>Anti-Aliasing filters are generally in the following form, with a value of 1 for all of the neighboring pixels and a value of k with k>1 for the center pixel p0. k is a variable value that helps to determine the strength of the anti-aliasing.</p>
+            <img src="images/anti_aliasing_filter.png" alt="example anti-aliasing filter" class="diagram">
+            <p>The 0's in the filter exist to ensure that filter only interacts with the same color neighbors of p0. This filter will smoothen out an image by applying an effect similar to an average filter, but by increasing or decreasing the value of k, you can set how much weight to give the center pixel.</p>
+            <p>We will use this image of a capital letter 'W' with blocky edges as an example to see the effects of anti-aliasing.</p>
+            <img src="images/blocky_w.png" alt="blocky W image" class="diagram">
+            <p>After applying the anti-aliasing filter with a k value of 12, we get this blurry W with smoother edges.</p>
+            <img src="images/blurry_w.png" alt='filtered W image' class="diagram">
+            <p>Since the resulting image is very blurry, we can see that the chosen k value was too extreme. In fact, k values are generally fairly small - a good general value to use is k=8. Despite that, we can easily see that the originally blocky edges have been smoothened out.</p>
+            <p>Lastly, we can apply the Anti-Aliasing Filter to the bayer image.</p>
+            <img src="images/AAF-image.png" alt="anti-aliasing filter image" class="bayer-img">
+            <p class="img-description">Resulting image after applying Anti-Aliasing Filter</p>
+            <div class="details-container">
+              <details>
+                <summary>Show full AAF code</summary>
+                <code>
+  def AAF(lsc_img, k):
+    """
+    inputs:
+    lsc_img = bayer domain image after lens shading correcting
+    k = anti-aliasing correction factor to control strenght of anti-aliasing
+
+    outputs:
+    aaf_img = bayer domain image after applying anti-aliasing
+    """
+    padded_img = np.pad(lsc_img, (2,2), 'reflect') # pad the image to give corner pixels full set of neighbors
+
+    p1 = padded_img[:-4:1, :-4:1] # create 9 different arrays for p0:p8
+    p2 = padded_img[:-4:1, 2:-2:1]
+    p3 = padded_img[:-4:1, 4::1]
+    p4 = padded_img[2:-2:1, :-4:1]
+    p0 = padded_img[2:-2:1, 2:-2:1] * (k**0.5) # compensate for dividing by smaller value
+    p5 = padded_img[2:-2:1, 4::1]
+    p6 = padded_img[4::1, :-4:1]
+    p7 = padded_img[4::1, 2:-2:1]
+    p8 = padded_img[4::1, 4::1]
+
+    neighbors = np.array([p1, p2, p3, p4, p0, p5, p6, p7, p8]) / ((k + 8)**0.5) # give the image extra brightness
+    aaf_img = (np.sum(neighbors, axis = 0)).astype(np.uint16) # apply the filter
+
+    return aaf_img
+
+  k = 64
+  aaf_img = AAF(lsc_img, k)
+
+  plt.imshow(aaf_img, cmap = 'gray')
+                </code>
+              </details>
+            </div>
+          </article>
+        </section>
+
+        <section class='main-section' id='AWB_Gain_Control'>
+          <header class="bold">AWB Gain Control</header>
+          <article>
+            <p><a href='https://www.youtube.com/watch?v=MQi7QbS4FqA' target="_blank">Link</a> to the AWB video</p>
+            
+          </article>
+        </section>
+
+        <section class='main-section' id='Color_Filter_Array_Interpolation'>
+          <header class="bold">Color Filter Array Interpolation</header>
+          <article>
+            <p><a href='' target="_blank">Link</a> to the ___ video</p>  
+          </article>
+        </section>
+
+        <section class='main-section' id='Gamma_Correction'>
+          <header class="bold">Gamma Correction</header>
+          <article>
+            <p><a href='' target="_blank">Link</a> to the ___ video</p>
+          </article>
+        </section>
+
+        <section class='main-section' id='Color_Space_Conversion'>
+          <header class="bold">Color Space Conversion</header>
+          <article>
+            <p><a href='' target="_blank">Link</a> to the ___ video</p>
+          </article>
+        </section>
+
+        <section class='main-section' id='Noise_Filter_for_Chroma'>
+          <header class="bold">Noise Filter for Chroma</header>
+          <article>
+            <p><a href='' target="_blank">Link</a> to the ___ video</p>
+          </article>
+        </section>
+
+        <section class='main-section' id='Hue_Saturation_Control'>
+          <header class="bold">Hue Saturation Control</header>
+          <article>
+            <p><a href='' target="_blank">Link</a> to the ___ video</p>
+          </article>
+        </section>
+
+        <section class='main-section' id='Noise_Filter_for_Luma'>
+          <header class="bold">Noise Filter for Luma</header>
+          <article>
+            <p><a href='' target="_blank">Link</a> to the ___ video</p>
+          </article>
+        </section>
+
+        <section class='main-section' id='Edge_Enhancement_Filter'>
+          <header class="bold">Edge Enhancement Filter</header>
+          <article>
+            <p><a href='' target="_blank">Link</a> to the ___ video</p>
+          </article>
+        </section>
+
+        <section class='main-section' id='Contrast_Brightness_Control'>
+          <header class="bold">Contrast Brightness Control</header>
+          <article>
+            <p><a href=''>Link</a> to the ___ video</p>
+          </article>
+        </section>
+
+      </main>
+
+    </body>
+</html>

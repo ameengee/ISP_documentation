@@ -1,0 +1,167 @@
+/*
+general styles for the full document starts here
+*/
+
+* {
+    box-sizing: border-box;
+    scroll-behavior: smooth;
+}
+
+img {
+    display: block;
+    margin: auto;
+}
+
+a {
+    color: blue;
+    display: inline-block;
+}
+
+a:hover {
+    color: black;
+    background-color: rgb(200, 200, 200);
+    cursor: pointer;
+}
+
+.bold {
+    font-weight: bold;
+    font-size: 1.7rem;
+}
+
+/*
+general styles for the full document ends here
+*/
+
+
+
+/*
+nav bar styling starts here
+*/
+
+#navbar {
+    position: fixed;
+    display: flex;
+    flex-direction: column;
+    left: 0;
+    top: 0;
+    width: min(30vw, 350px);
+    height: 98%;
+    border-right: 2px solid black;
+    text-align: center;
+}
+
+#navbar header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 8%;
+}
+
+#navbar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#navbar li {
+    border-bottom: 2px solid black;
+    position: relative;
+}
+
+.nav-link {
+    text-decoration: none;
+    color: black;
+    font-size: min(2.4vw, 18px);
+    cursor: pointer;
+    display: block;
+    padding: 5% 0;
+}
+
+.nav-link:hover {
+    background-color: rgb(210, 210, 210);
+    color: black;
+}
+
+#navbar header{
+    padding: 0;
+    margin: 0;
+    border-bottom: 2px solid black;
+    font-size: min(3.2vw, 20px);
+}
+
+/*
+nav bar styling ends here
+*/
+
+
+
+/*
+main document styling starts here
+*/
+
+main {
+    width: max(65vw, calc(100vw - 415px));
+    position: absolute;
+    left: min(31.5vw, 375px);
+    right: min(2.5vw, 40px);
+}
+
+main p, li {
+    font-size: min(2.2vw, 17px);
+}
+
+.img-description {
+    text-align: center;
+    margin: 10px 5% 30px 5%;
+}
+
+section {
+    padding-top: 20px;
+}
+
+.rect-img {
+    width: 100%;
+    padding: 30px;
+    max-width: 800px;
+}
+
+.bayer-img {
+    width: 70vw;
+    padding: 15px;
+    max-width: 500px;
+}
+
+.diagram {
+    width: 55vw;
+    padding: 15px;
+    max-width: 400px;
+}
+
+code {
+    display: block;
+    text-align: left;
+    white-space: pre-wrap;
+    position: relative;
+    word-break: break-word;
+    line-height: 2;
+    background-color: #f7f7f7;
+    margin: 10px;
+    padding: 5px;
+    border-radius: 5px;
+}
+
+.details-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+details {
+    text-align: center;
+}
+
+/*
+main document styling ends here
+*/
